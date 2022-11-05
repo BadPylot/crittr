@@ -5,9 +5,6 @@ interface Config {
     port:number,
     dbUri:string
 }
-interface LocationsData {
-    locationsData:Array<Location>
-}
 interface Location {
 locName:string,
 radius:number,
@@ -33,14 +30,14 @@ const Post = model<Post>("Post", postSchema);
 
 const app = express();
 app.use(express.json());
-let locationsData:LocationsData = JSON.parse(fs.readFileSync("./config/locations.json", {"encoding":"utf-8"}));
+let locationsData:[Location] = JSON.parse(fs.readFileSync("./config/locations.json", {"encoding":"utf-8"}));
 let config:Config = JSON.parse(fs.readFileSync("./config/config.json", {"encoding":"utf-8"}));
 app.get("/getLocations", (req, res) => {
     res.json(locationsData);
 });
 app.get("/getPosts", async (req, res) => {
     const location:string = req.query.location as string;
-    if (!location || !locationsData.locationsData.find((e) => e.locName == location)) return;
+    if (!location || !locationsData.find((e) => e.locName == location)) return;
     const relevPosts = await Post.find({ location: location });
     const returnPosts:Array<Post> = [];
     for (const post of relevPosts) {
