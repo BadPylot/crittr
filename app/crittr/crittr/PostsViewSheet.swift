@@ -88,6 +88,7 @@ struct PostView: View {
                     }
                     post.score += post.userReview
                     serverManager.ratePost(postId:post.id, ratingType: InteractionType(rawValue: post.userReview)!)
+                    UISelectionFeedbackGenerator().selectionChanged()
                 }
                 Text(post.score.description)
                 Group {
@@ -116,6 +117,7 @@ struct PostView: View {
                     }
                     post.score += post.userReview
                     serverManager.ratePost(postId:post.id, ratingType: InteractionType(rawValue: post.userReview)!)
+                    UISelectionFeedbackGenerator().selectionChanged()
                 }
                 .rotationEffect(.degrees(180))
                 //                Image(systemName:"pawprint")
@@ -123,6 +125,6 @@ struct PostView: View {
                 Spacer()
             }
         }
-        .frame(height:75)
+        .frame(height:60)
     }
 }
