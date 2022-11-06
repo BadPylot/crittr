@@ -8,17 +8,24 @@ struct PostsViewSheet: View {
             Text(selectedLoc)
                 .padding(.top, 16.0)
                 .font(.title)
+            Spacer()
             if (serverManager.locPosts[selectedLoc] == nil) {
                 HStack{
                     Spacer()
                     Text("Loading...")
                     Spacer()
                 }
+                Spacer()
             } else {
                 let timeSortedPosts = serverManager.locPosts[selectedLoc]!.sorted(by: { $0.date > $1.date })
-                List {
-                    ForEach(timeSortedPosts, id: \.id) { post in
-                        PostView(displayPost:post)
+                if (timeSortedPosts.isEmpty) {
+                    Text("No posts here just yet.")
+                    Spacer()
+                } else {
+                    List {
+                        ForEach(timeSortedPosts, id: \.id) { post in
+                            PostView(displayPost:post)
+                        }
                     }
                 }
             }

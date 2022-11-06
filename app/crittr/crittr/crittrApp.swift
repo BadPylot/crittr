@@ -27,6 +27,9 @@ class ServerManager: ObservableObject {
         let locationManager = CLLocationManager()
         var lowestDistanceFrom:Double = 1000
         var closestLoc = ""
+        if (locationManager.location == nil) {
+            return ""
+        }
         for location in mapLocs {
             let distance = locationManager.location!.distance(from: CLLocation(latitude:location.xCoord, longitude:location.yCoord)) * 3.28084
             if ((distance < lowestDistanceFrom) && (distance <= location.radius)) {
