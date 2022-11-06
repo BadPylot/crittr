@@ -8,6 +8,11 @@ struct PostsViewSheet: View {
             Text(selectedLoc)
                 .padding(.top, 16.0)
                 .font(.title)
+            if (serverManager.location != selectedLoc) {
+                Text("This building is locked")
+                Text("Move closer to interact")
+                    .font(.system(size:12))
+            }
             Spacer()
             if (serverManager.locPosts[selectedLoc] == nil) {
                 HStack{
@@ -17,14 +22,13 @@ struct PostsViewSheet: View {
                 }
                 Spacer()
             } else {
-                let timeSortedPosts = serverManager.locPosts[selectedLoc]!.sorted(by: { $0.date > $1.date })
-                if (timeSortedPosts.isEmpty) {
-                    Text("No posts here just yet.")
+                if (serverManager.locPosts[selectedLoc]!.isEmpty) {
+                    Text("No posts here just yet")
                     Spacer()
                 } else {
                     List {
-                        ForEach(timeSortedPosts, id: \.id) { post in
-                            PostView(displayPost:post)
+                        ForEach(serverManager.locPosts[selectedLoc]!, id: \.id) { post in
+                            PostView(post:post, serverManager: serverManager)
                         }
                     }
                 }
@@ -38,30 +42,87 @@ struct PostsViewSheet: View {
     }
 }
 struct PostView: View {
-    var displayPost:Post
+    @ObservedObject var post:PostMutable
+    var serverManager:ServerManager
     let formatter = RelativeDateTimeFormatter()
+    init(post: PostMutable, serverManager: ServerManager) {
+        self.post = post
+        self.serverManager = serverManager
+    }
     var body: some View {
         HStack {
             VStack(alignment:.leading) {
-                Text(displayPost.text)
+                Text(post.text)
                     .lineLimit(nil)
                     .minimumScaleFactor(0.5)
                 Spacer()
-                Text(formatter.localizedString(for: Date.init(timeIntervalSince1970: TimeInterval(displayPost.date / 1000)), relativeTo: Date()))
+                Text(formatter.localizedString(for: Date.init(timeIntervalSince1970: TimeInterval(post.date / 1000)), relativeTo: Date()))
                     .font(.system(size: 12))
             }
             Spacer()
             VStack {
                 Spacer()
-                
+                Group {
+                    if (post.userReview != InteractionType.plus.rawValue) {
+                        if (!(serverManager.location != post.location)) {
+                            Image(systemName:"pawprint")
+                        } else {
+                            Image(systemName:"pawprint.fill")
+                                .foregroundColor(.gray)
+                        }
+                    } else {
+                        Image(systemName:"pawprint.fill")
+                            .foregroundColor(.orange)
+                    }
+                }
+                .onTapGesture {
+                    if (serverManager.location != post.location)
+                    {
+                        return
+                    }
+                    post.score -= post.userReview
+                    if (post.userReview != InteractionType.plus.rawValue) {
+                        post.userReview = InteractionType.plus.rawValue
+                    } else {
+                        post.userReview = InteractionType.zero.rawValue
+                    }
+                    post.score += post.userReview
+                    serverManager.ratePost(postId:post.id, ratingType: InteractionType(rawValue: post.userReview)!)
+                }
+                Text(post.score.description)
+                Group {
+                    if (post.userReview != InteractionType.minus.rawValue) {
+                        if (!(serverManager.location != post.location)) {
+                            Image(systemName:"pawprint")
+                        } else {
+                            Image(systemName:"pawprint.fill")
+                                .foregroundColor(.gray)
+                        }
+                    } else {
+                        Image(systemName:"pawprint.fill")
+                            .foregroundColor(.blue)
+                    }
+                }
+                .onTapGesture {
+                    if (serverManager.location != post.location)
+                    {
+                        return
+                    }
+                    post.score -= post.userReview
+                    if (post.userReview != InteractionType.minus.rawValue) {
+                        post.userReview = InteractionType.minus.rawValue
+                    } else {
+                        post.userReview = InteractionType.zero.rawValue
+                    }
+                    post.score += post.userReview
+                    serverManager.ratePost(postId:post.id, ratingType: InteractionType(rawValue: post.userReview)!)
+                }
+                .rotationEffect(.degrees(180))
+                //                Image(systemName:"pawprint")
+                //                    .rotationEffect(.degrees(180))
                 Spacer()
             }
         }
         .frame(height:75)
     }
-}
-enum InteractionTypes {
-    case none
-    case plus
-    case minus
 }

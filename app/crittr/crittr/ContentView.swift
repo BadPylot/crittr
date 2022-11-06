@@ -20,23 +20,27 @@ struct ContentView: View {
                             .resizable()
                             .frame(width:100, height:100)
                             .aspectRatio(contentMode: .fit)
-                        Text("Crittr")
-                            .font(.custom("AppleGothic", size: 33))
-                            .padding([.top], -10)
-                            .bold()
+                        HStack {
+                            Text("crittr")
+                            Text(".")
+                                .padding([.leading], -12)
+                        }
+                        .font(.custom("AppleGothic", size: 33))
+                        .padding([.top], -10)
+                        .bold()
                     }
                     .padding(.leading)
                     Spacer()
                     VStack {
                         Text("Your current location:")
-                        if (serverManager.getLocation() == "") {
-                                Text("Nowhere!")
-                                    .font(.system(size:24))
-                                    .bold()
-                                Text("Move to a building to start posting")
-                                    .font(.system(size:9))
+                        if (serverManager.location == "") {
+                            Text("Nowhere!")
+                                .font(.system(size:24))
+                                .bold()
+                            Text("Move to a building to start posting")
+                                .font(.system(size:9))
                         } else {
-                            Text(serverManager.getLocation())
+                            Text(serverManager.location)
                                 .font(.system(size:24))
                                 .bold()
                         }
@@ -96,7 +100,7 @@ struct ContentView: View {
                                 .background(Color.blue)
                                 .cornerRadius(40)
                                 .onTapGesture {
-                                    if ((serverManager.getLocation() == "") || newPost == "") {
+                                    if ((serverManager.location == "") || newPost == "") {
                                         return
                                     }
                                     serverManager.sendPost(postText: newPost)

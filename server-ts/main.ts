@@ -15,18 +15,40 @@ interface RawPost {
     text:string,
     location:string
 }
-interface Post extends RawPost {
-    score:number,
+interface StoragePost extends RawPost {
     // Unix Timestamp of Post
-    date:number
+    date:number,
+    ratings:[PostRatingStorage]
 }
-const postSchema = new Schema<Post>({
+interface RemotePost extends RawPost {
+    id:string,
+    date:number,
+    score:number,
+    userReview:InteractionType
+}
+interface PostRatingStorage {
+userId:string
+interactionType:InteractionType
+}
+interface PostRating extends PostRatingStorage {
+    postId:string
+}
+enum InteractionType {
+    "minus" = -1,
+    "zero" = 0,
+    "plus" = 1
+}
+const PostRatingStorageSchema = new Schema<PostRatingStorage>({
+    userId: String,
+    interactionType: Number,
+});
+const postSchema = new Schema<StoragePost>({
     text: { type: String, required: true },
-    score: { type: Number, required: true },
     location: { type: String, required: true },
     date: {type: Number, required: true},
+    ratings: {type: [PostRatingStorageSchema], required: true},
 });
-const Post = model<Post>("Post", postSchema);
+const Post = model<StoragePost>("Post", postSchema);
 
 const app = express();
 app.use(express.json());
@@ -37,16 +59,25 @@ app.get("/getLocations", (req, res) => {
 });
 app.get("/getPosts", async (req, res) => {
     const location:string = req.query.location as string;
-    if (!location || !locationsData.find((e) => e.locName == location)) return;
+    const user:string = req.query.user as string;
+    if (!location || !locationsData.find((e) => e.locName == location)) return res.sendStatus(400);
+    if (!user) return res.send(401);
     const relevPosts = await Post.find({ location: location });
-    const returnPosts:Array<Post> = [];
+    const returnPosts:Array<RemotePost> = [];
     for (const post of relevPosts) {
-        const cleanPost = {
+        let userReview:InteractionType = InteractionType.zero;
+        let postRating = 0;
+        for (const rating of post.ratings) {
+            postRating += rating.interactionType;
+            if (rating.userId == user) userReview = rating.interactionType;
+        }
+        const cleanPost:RemotePost = {
             text: post.text,
-            score: post.score,
+            score: postRating,
             location: post.location,
             date: post.date,
-            id: post._id,
+            id: post._id.toString(),
+            userReview: userReview,
         };
         returnPosts.push(cleanPost);
     }
@@ -54,12 +85,29 @@ app.get("/getPosts", async (req, res) => {
 });
 app.post("/newPost", async (req, res) => {
     const postData = req.body as RawPost;
+    if (typeof postData.text != "string") return res.sendStatus(400);
     await (new Post({
         text: postData.text || "",
         score: 0,
         location: postData.location || "",
         date: (new Date()).getTime(),
     }).save());
+    res.sendStatus(200);
+});
+app.post("/ratePost", async (req, res) => {
+    const postData = req.body as PostRating;
+    const postToRate = await Post.findOne({ _id: postData.postId });
+    if (!postToRate) return res.sendStatus(200);
+    const oldRatingIndex = postToRate.ratings.findIndex((e) => e.userId === postData.userId);
+    if (oldRatingIndex > -1) {
+        postToRate.ratings[oldRatingIndex].interactionType = postData.interactionType;
+    } else {
+        postToRate.ratings.push({
+            userId: postData.userId,
+            interactionType: postData.interactionType,
+        });
+    }
+    await postToRate.save();
     res.sendStatus(200);
 });
 fs.watch("./config/locations.json", async () => {
