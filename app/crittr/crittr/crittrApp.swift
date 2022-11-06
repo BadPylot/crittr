@@ -87,7 +87,9 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
                 newLocData.append(MapLocation(name:oldLoc.locName, radius: oldLoc.radius, xCoord:oldLoc.xCoord, yCoord: oldLoc.yCoord))
             }
             mapLocs = newLocData
-            setLocationFromCoords(newLocation: locationManager.location!)
+            if (locationManager.location != nil) {
+                setLocationFromCoords(newLocation: locationManager.location!)
+            }
         } catch {
             // TODO: Add error handling
         }
@@ -97,9 +99,12 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
         do {
             let url = URL(string:"\(apiUrl)/getPosts?location=\(location.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)!)&user=\(UIDevice.current.identifierForVendor!.uuidString)")!
             let (data, _) = try await urlSess.data(from: url)
-            let postResponse = try! JSONDecoder().decode([Post].self, from: data)
+            let postResponse = try? JSONDecoder().decode([Post].self, from: data)
+            if (postResponse == nil) {
+                return
+            }
             var newLocPosts:[PostMutable] = []
-            for post in postResponse {
+            for post in postResponse! {
                 newLocPosts.append(PostMutable(post: post))
             }
             locPosts[location] = newLocPosts.sorted(by: { $0.date > $1.date })

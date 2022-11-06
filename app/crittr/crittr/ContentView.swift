@@ -53,7 +53,8 @@ struct ContentView: View {
                     let footSize: Double = (geometry.size.height/(region.span.latitudeDelta * 288200))
                     Map(coordinateRegion: $region, showsUserLocation: true, annotationItems: serverManager.mapLocs) { mapLoc in
                         MapAnnotation(coordinate: mapLoc.coordinate) {
-                            let fillColor:Color = (selectedLoc != mapLoc.name) ? Color(UIColor(red: 0, green: 0, blue: 1, alpha: 0.2)) : Color(UIColor(red: 0, green: 0, blue: 1, alpha: 0.4))
+                            // If I don't compare selectedLoc to anything, for some reason, inexplicably, it hangs when set (on .onTapGesture) and messes up some API code. I cannot explain why this happens. I don't get it.
+                            let fillColor:Color = (serverManager.location == mapLoc.name && (selectedLoc == "" || true)) ? Color.mint.opacity(0.35) : Color.secondary.opacity(0.2)
                             ZStack {
                                 Text(mapLoc.name)
                                     .frame(width:(footSize * mapLoc.radius))
@@ -61,10 +62,11 @@ struct ContentView: View {
                                     .minimumScaleFactor(0.01)
                                     .lineLimit(1)
                                     .allowsHitTesting(false)
+                                    .bold()
                                 Circle()
                                     .fill(fillColor)
                                     .overlay(Circle()
-                                        .stroke(.blue.opacity(0.5), lineWidth: 1)
+                                        .stroke(fillColor.opacity(0.5), lineWidth: 1)
                                     )
                                     .frame(width:(footSize * mapLoc.radius))
                                     .onTapGesture {
