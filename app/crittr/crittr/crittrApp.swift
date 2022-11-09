@@ -10,21 +10,20 @@ struct crittrApp: App {
             ContentView(serverManager: serverManager)
         }
     }
-    init() {
-    }
 }
 // This should really be called something besides servermanager because it does location too but we ball i guess.
 class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     @Published var locPosts: [CLLocation: [PostMutable]] = [:]
+    var locPostsUpdated: [CLLocation: Date] = [:]
     @Published var locName:String = ""
-    var geocoder = CLGeocoder()
+    private var geocoder = CLGeocoder()
     // curCoords is the current location of the user
-    var curCoords:CLLocation = CLLocation()
+    var curLoc:CLLocation = CLLocation()
     // locCoords is the coordinates of the nearest location
-    var locCoords:CLLocation = CLLocation()
-    var lastLocUpdate = Date(timeIntervalSince1970: 0)
-    var locUpdateReq = false
-    var locationManager:CLLocationManager
+    var placeLoc:CLLocation = CLLocation()
+    private var lastLocUpdate = Date(timeIntervalSince1970: 0)
+    private var locUpdateReq = false
+    private var locationManager:CLLocationManager
     override init() {
         self.locationManager = CLLocationManager()
         super.init()
@@ -34,7 +33,7 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     func locationManager(_: CLLocationManager, didUpdateLocations: [CLLocation]) {
         if (didUpdateLocations.first != nil) {
             reqLocUpdate(newLoc:didUpdateLocations.first!)
-            self.curCoords = didUpdateLocations.first!
+            self.curLoc = didUpdateLocations.first!
         }
     }
     func locationManagerDidChangeAuthorization(_: CLLocationManager) {
@@ -52,7 +51,7 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
         if (locUpdateReq) {
             return
         }
-        if (newLoc == curCoords) {
+        if (newLoc == curLoc) {
             return
         }
         locUpdateReq = true
@@ -62,26 +61,33 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
             if (timeSinceLast < 60) {
                 try await Task.sleep(nanoseconds: UInt64(60 * 1_000_000_000))
             }
-            geocoder.reverseGeocodeLocation(curCoords, completionHandler:gcHandler)
+            geocoder.reverseGeocodeLocation(curLoc, completionHandler:gcHandler)
             locUpdateReq = false
         }
     }
     func gcHandler(placemarks: [CLPlacemark]?, _: Error?) {
         if (placemarks == nil || placemarks!.isEmpty || (placemarks!.first!.location == nil) || (placemarks!.first!.subThoroughfare == nil) || (placemarks!.first!.thoroughfare == nil)) {
-            locCoords = CLLocation()
+            placeLoc = CLLocation()
             locName = ""
+            return
         }
         locName = "\(placemarks!.first!.subThoroughfare!) \(placemarks!.first!.thoroughfare!)"
-        let doUpdate = (placemarks!.first!.location! != locCoords)
-        locCoords = placemarks!.first!.location!
+        let doUpdate = (placemarks!.first!.location! != placeLoc)
+        if (placemarks!.first!.region! is CLCircularRegion) {
+            let circRegion:CLCircularRegion = placemarks!.first!.region! as! CLCircularRegion
+            // Use location's region coords because using the location's location coords varies
+            placeLoc = CLLocation(latitude:circRegion.center.latitude,longitude:circRegion.center.longitude)
+        } else {
+            placeLoc = placemarks!.first!.location!
+        }
         if (doUpdate) {
             Task {
-                await updatePosts(location: locCoords)
+                await updatePosts(location: placeLoc)
             }
         }
     }
     func sendPost(postText:String) {
-        let locData = LocData(lat: self.locCoords.coordinate.latitude, long: self.locCoords.coordinate.longitude)
+        let locData = LocData(lat: self.placeLoc.coordinate.latitude, long: self.placeLoc.coordinate.longitude)
         let postData = RawPost(text:postText, location:locData)
         let urlSess:URLSession = URLSession.init(configuration: URLSessionConfiguration.ephemeral)
         var urlRequest = URLRequest(url:URL(string:"\(apiUrl)/newPost")!)
@@ -94,7 +100,7 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     }
     func sendPostCompHandler(_: Data?, _:  URLResponse?, _: (any Error)?) {
         Task {
-            await updatePosts(location: locCoords)
+            await updatePosts(location: placeLoc)
         }
     }
     func ratePost(postId:String, ratingType:InteractionType) {
@@ -124,6 +130,7 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
             for post in postResponse! {
                 newLocPosts.append(PostMutable(post: post))
             }
+            locPostsUpdated[location] = Date()
             locPosts[location] = newLocPosts.sorted(by: { $0.date > $1.date })
         } catch {
             // TODO: Add error handling
@@ -173,7 +180,6 @@ enum InteractionType: Int {
     case plus = 1
 }
 extension CLLocationCoordinate2D: Equatable {}
-
 public func ==(lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
     return (lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude)
 }

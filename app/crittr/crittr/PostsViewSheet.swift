@@ -1,29 +1,29 @@
+import CoreLocation
 import Foundation
 import SwiftUI
 struct PostsViewSheet: View {
     @ObservedObject var serverManager: ServerManager
     var body: some View {
         VStack {
-            if (serverManager.locPosts[serverManager.locCoords] == nil) {
-                HStack{
-                    Spacer()
+            List {
+                if (serverManager.placeLoc.coordinate == CLLocation().coordinate) {
+                    Text("Move to a building to view posts.")
+                } else if (serverManager.locPosts[serverManager.placeLoc] == nil) {
                     Text("Loading...")
-                    Spacer()
-                }
-                Spacer()
-            } else {
-                List {
-                    if (serverManager.locPosts[serverManager.locCoords]!.isEmpty) {
-                        Text("No posts here just yet.")
-                    }
-                    ForEach(serverManager.locPosts[serverManager.locCoords]!, id: \.id) { post in
+                } else if (serverManager.locPosts[serverManager.placeLoc]!.isEmpty) {
+                    Text("No posts here just yet.")
+                } else {
+                    ForEach(serverManager.locPosts[serverManager.placeLoc]!, id: \.id) { post in
                         PostView(post:post, serverManager: serverManager)
                     }
-                }
-                .refreshable {
-                    await serverManager.updatePosts(location: serverManager.locCoords)
-                }
             }
+            }
+            .refreshable {
+                if (!(serverManager.placeLoc.coordinate == CLLocation().coordinate)) {
+                    await serverManager.updatePosts(location: serverManager.placeLoc)
+            }
+            }
+            .scrollContentBackground(.hidden)
         }
     }
 }
@@ -42,7 +42,7 @@ struct PostView: View {
                     .lineLimit(nil)
                     .minimumScaleFactor(0.5)
                 Spacer()
-                Text(formatter.localizedString(for: Date.init(timeIntervalSince1970: TimeInterval(post.date / 1000)), relativeTo: Date()))
+                Text(formatter.localizedString(for: Date.init(timeIntervalSince1970: TimeInterval(post.date / 1000)), relativeTo: (serverManager.locPostsUpdated[serverManager.placeLoc] ?? Date.now)))
                     .font(.system(size: 12))
             }
             Spacer()
@@ -50,7 +50,7 @@ struct PostView: View {
                 Spacer()
                 Group {
                     if (post.userReview != InteractionType.plus.rawValue) {
-                        if (serverManager.locCoords.coordinate == post.location.coordinate) {
+                        if (serverManager.placeLoc.coordinate == post.location.coordinate) {
                             Image(systemName:"pawprint")
                         } else {
                             Image(systemName:"pawprint.fill")
@@ -62,7 +62,7 @@ struct PostView: View {
                     }
                 }
                 .onTapGesture {
-                    if (!(serverManager.locCoords.coordinate == post.location.coordinate))
+                    if (!(serverManager.placeLoc.coordinate == post.location.coordinate))
                     {
                         return
                     }
@@ -79,7 +79,7 @@ struct PostView: View {
                 Text(post.score.description)
                 Group {
                     if (post.userReview != InteractionType.minus.rawValue) {
-                        if (serverManager.locCoords.coordinate == post.location.coordinate) {
+                        if (serverManager.placeLoc.coordinate == post.location.coordinate) {
                             Image(systemName:"pawprint")
                         } else {
                             Image(systemName:"pawprint.fill")
@@ -91,7 +91,7 @@ struct PostView: View {
                     }
                 }
                 .onTapGesture {
-                    if (!(serverManager.locCoords.coordinate == post.location.coordinate))
+                    if (!(serverManager.placeLoc.coordinate == post.location.coordinate))
                     {
                         return
                     }
