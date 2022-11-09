@@ -1,20 +1,10 @@
 import Foundation
 import SwiftUI
 struct PostsViewSheet: View {
-    var selectedLoc: String
     @ObservedObject var serverManager: ServerManager
     var body: some View {
         VStack {
-            Text(selectedLoc)
-                .padding(.top, 16.0)
-                .font(.title)
-            if (serverManager.location != selectedLoc) {
-                Text("This building is locked")
-                Text("Move closer to interact")
-                    .font(.system(size:12))
-            }
-            Spacer()
-            if (serverManager.locPosts[selectedLoc] == nil) {
+            if (serverManager.locPosts[serverManager.locCoords] == nil) {
                 HStack{
                     Spacer()
                     Text("Loading...")
@@ -22,21 +12,17 @@ struct PostsViewSheet: View {
                 }
                 Spacer()
             } else {
-                if (serverManager.locPosts[selectedLoc]!.isEmpty) {
-                    Text("No posts here just yet")
-                    Spacer()
-                } else {
-                    List {
-                        ForEach(serverManager.locPosts[selectedLoc]!, id: \.id) { post in
-                            PostView(post:post, serverManager: serverManager)
-                        }
+                List {
+                    if (serverManager.locPosts[serverManager.locCoords]!.isEmpty) {
+                        Text("No posts here just yet.")
+                    }
+                    ForEach(serverManager.locPosts[serverManager.locCoords]!, id: \.id) { post in
+                        PostView(post:post, serverManager: serverManager)
                     }
                 }
-            }
-        }
-        .onAppear {
-            Task {
-                await serverManager.updatePosts(location:selectedLoc)
+                .refreshable {
+                    await serverManager.updatePosts(location: serverManager.locCoords)
+                }
             }
         }
     }
@@ -64,7 +50,7 @@ struct PostView: View {
                 Spacer()
                 Group {
                     if (post.userReview != InteractionType.plus.rawValue) {
-                        if (!(serverManager.location != post.location)) {
+                        if (serverManager.locCoords.coordinate == post.location.coordinate) {
                             Image(systemName:"pawprint")
                         } else {
                             Image(systemName:"pawprint.fill")
@@ -76,7 +62,7 @@ struct PostView: View {
                     }
                 }
                 .onTapGesture {
-                    if (serverManager.location != post.location)
+                    if (!(serverManager.locCoords.coordinate == post.location.coordinate))
                     {
                         return
                     }
@@ -93,7 +79,7 @@ struct PostView: View {
                 Text(post.score.description)
                 Group {
                     if (post.userReview != InteractionType.minus.rawValue) {
-                        if (!(serverManager.location != post.location)) {
+                        if (serverManager.locCoords.coordinate == post.location.coordinate) {
                             Image(systemName:"pawprint")
                         } else {
                             Image(systemName:"pawprint.fill")
@@ -105,7 +91,7 @@ struct PostView: View {
                     }
                 }
                 .onTapGesture {
-                    if (serverManager.location != post.location)
+                    if (!(serverManager.locCoords.coordinate == post.location.coordinate))
                     {
                         return
                     }
@@ -120,8 +106,6 @@ struct PostView: View {
                     UISelectionFeedbackGenerator().selectionChanged()
                 }
                 .rotationEffect(.degrees(180))
-                //                Image(systemName:"pawprint")
-                //                    .rotationEffect(.degrees(180))
                 Spacer()
             }
         }

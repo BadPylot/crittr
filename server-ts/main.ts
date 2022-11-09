@@ -5,15 +5,13 @@ interface Config {
     port:number,
     dbUri:string
 }
-interface Location {
-locName:string,
-radius:number,
-xCoord:number,
-yCoord:number
-}
 interface RawPost {
     text:string,
-    location:string
+    location:LocData
+}
+interface LocData {
+    lat:number,
+    long:number,
 }
 interface StoragePost extends RawPost {
     // Unix Timestamp of Post
@@ -42,9 +40,13 @@ const PostRatingStorageSchema = new Schema<PostRatingStorage>({
     userId: String,
     interactionType: Number,
 });
+const LocSchema = new Schema<LocData>({
+    lat: {type: Number, required: true},
+    long: {type: Number, required: true},
+});
 const postSchema = new Schema<StoragePost>({
     text: { type: String, required: true },
-    location: { type: String, required: true },
+    location: { type: LocSchema, required: true },
     date: {type: Number, required: true},
     ratings: {type: [PostRatingStorageSchema], required: true},
 });
@@ -52,17 +54,13 @@ const Post = model<StoragePost>("Post", postSchema);
 
 const app = express();
 app.use(express.json());
-let locationsData:[Location] = JSON.parse(fs.readFileSync("./config/locations.json", {"encoding":"utf-8"}));
 let config:Config = JSON.parse(fs.readFileSync("./config/config.json", {"encoding":"utf-8"}));
-app.get("/getLocations", (req, res) => {
-    res.json(locationsData);
-});
 app.get("/getPosts", async (req, res) => {
-    const location:string = req.query.location as string;
     const user:string = req.query.user as string;
-    if (!location || !locationsData.find((e) => e.locName == location)) return res.sendStatus(400);
-    if (!user) return res.send(401);
-    const relevPosts = await Post.find({ location: location });
+    if (!(user && typeof req.query.lat == "string" && typeof req.query.long == "string")) return res.send(401);
+    const lat:number = parseFloat(req.query.lat);
+    const long:number = parseFloat(req.query.long);
+    const relevPosts = await Post.find({ "location.lat":lat, "location.long":long });
     const returnPosts:Array<RemotePost> = [];
     for (const post of relevPosts) {
         let userReview:InteractionType = InteractionType.zero;
@@ -85,11 +83,14 @@ app.get("/getPosts", async (req, res) => {
 });
 app.post("/newPost", async (req, res) => {
     const postData = req.body as RawPost;
-    if (typeof postData.text != "string") return res.sendStatus(400);
+    if (!(typeof postData.text === "string" && typeof postData.location.lat === "number" && typeof postData.location.long === "number")) return res.sendStatus(400);
     await (new Post({
         text: postData.text || "",
         score: 0,
-        location: postData.location || "",
+        location: {
+            lat:postData.location.lat,
+            long:postData.location.long,
+        },
         date: (new Date()).getTime(),
     }).save());
     res.sendStatus(200);
@@ -110,14 +111,6 @@ app.post("/ratePost", async (req, res) => {
     await postToRate.save();
     res.sendStatus(200);
 });
-fs.watch("./config/locations.json", async () => {
-    const locationsText = await fs.promises.readFile("./config/locations.json", {"encoding":"utf-8"});
-    try {
-        locationsData = JSON.parse(locationsText);
-    } catch {
-        // Who cares?
-    }
-});
 fs.watch("./config/config.json", async () => {
     const configText = await fs.promises.readFile("./config/config.json", {"encoding":"utf-8"});
     try {
@@ -129,7 +122,7 @@ fs.watch("./config/config.json", async () => {
 async function main() {
     await connect(config.dbUri);
     app.listen(config.port, () => {
-        console.log(`Example app listening on port ${config.port}`);
+        console.log(`Server listening on port ${config.port}`);
     });
 
 }
