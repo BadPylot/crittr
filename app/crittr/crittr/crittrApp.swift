@@ -40,7 +40,7 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     func locationManagerDidChangeAuthorization(_: CLLocationManager) {
         if (locationManager.authorizationStatus == .notDetermined) {
             locationManager.requestWhenInUseAuthorization()
-        } else {
+        } else if (locationManager.authorizationStatus == .authorizedWhenInUse){
             locationManager.requestLocation()
             locationManager.startUpdatingLocation()
         }
@@ -113,6 +113,9 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
         do {
             let url = URL(string:"\(apiUrl)/getPosts?lat=\(location.coordinate.latitude.description.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)!)&long=\(location.coordinate.longitude.description.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)!)&user=\(UIDevice.current.identifierForVendor!.uuidString)")!
             let (data, _) = try await urlSess.data(from: url)
+            if (data.isEmpty) {
+                return
+            }
             let postResponse = try? JSONDecoder().decode([Post].self, from: data)
             if (postResponse == nil) {
                 return
