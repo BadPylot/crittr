@@ -32,8 +32,12 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     // Delegate Functions
     func locationManager(_: CLLocationManager, didUpdateLocations: [CLLocation]) {
         if (didUpdateLocations.first != nil) {
-            reqLocUpdate(newLoc:didUpdateLocations.first!)
-            self.curLoc = didUpdateLocations.first!
+            let oldLoc = curLoc
+            curLoc = didUpdateLocations.first!
+            // If the user has moved less than 50 feet (converted to meters for comparison)
+            if (oldLoc.distance(from: curLoc) > (50 * 0.3048)) {
+                reqLocUpdate()
+            }
         }
     }
     func locationManagerDidChangeAuthorization(_: CLLocationManager) {
@@ -45,22 +49,19 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
         }
     }
     func locationManager(_: CLLocationManager, didFailWithError: Error) {
-        // Don't care about errors for now
+        // Don't care about errors for now, but app crashes without handler (as per Apple specs)
     }
-    func reqLocUpdate(newLoc:CLLocation?) {
+    func reqLocUpdate() {
         if (locUpdateReq) {
-            return
-        }
-        if (newLoc == curLoc) {
             return
         }
         locUpdateReq = true
         let timeSinceLast = Date.now.timeIntervalSince(lastLocUpdate)
-        lastLocUpdate = Date()
         Task {
             if (timeSinceLast < 60) {
                 try await Task.sleep(nanoseconds: UInt64(60 * 1_000_000_000))
             }
+            lastLocUpdate = Date()
             geocoder.reverseGeocodeLocation(curLoc, completionHandler:gcHandler)
             locUpdateReq = false
         }
@@ -72,13 +73,16 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
             return
         }
         locName = "\(placemarks!.first!.subThoroughfare!) \(placemarks!.first!.thoroughfare!)"
-        let doUpdate = (placemarks!.first!.location! != placeLoc)
+        var doUpdate = false;
+        // Use location's region coords because using the location's location coords varies
         if (placemarks!.first!.region! is CLCircularRegion) {
             let circRegion:CLCircularRegion = placemarks!.first!.region! as! CLCircularRegion
-            // Use location's region coords because using the location's location coords varies
-            placeLoc = CLLocation(latitude:circRegion.center.latitude,longitude:circRegion.center.longitude)
+            let newPlaceLoc = CLLocation(latitude:circRegion.center.latitude,longitude:circRegion.center.longitude)
+            doUpdate = (newPlaceLoc != placeLoc)
+            placeLoc = newPlaceLoc
         } else {
             placeLoc = placemarks!.first!.location!
+            doUpdate = true
         }
         if (doUpdate) {
             Task {

@@ -30,7 +30,7 @@ struct ContentView: View {
                     Spacer()
                     VStack {
                         Text("Your current circle:")
-                        if (serverManager.locName == "") {
+                        if (serverManager.placeLoc.coordinate == CLLocation().coordinate) {
                             Text("Nowhere!")
                                 .font(.system(size:24))
                                 .bold()
@@ -56,7 +56,7 @@ struct ContentView: View {
                     .fill(.background)
                     .cornerRadius(20, corners: [.topLeft, .topRight])
                 VStack {
-                    TextField("Tap here to start a new post", text:$newPost, axis: .vertical)
+                    TextField((serverManager.placeLoc.coordinate != CLLocation().coordinate) ? "Tap here to start a new post" : "Move to a building to start posting", text:$newPost, axis: .vertical)
                         .lineLimit(4...4)
                         .cornerRadius(10.0)
                         .focused($newPostActive)
