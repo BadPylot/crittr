@@ -1,27 +1,28 @@
 import CoreLocation
 import Foundation
 import SwiftUI
-struct PostsViewSheet: View {
+struct PostListView: View {
     @ObservedObject var serverManager: ServerManager
+    @Binding var targetLoc:CLLocation
     var body: some View {
         VStack {
             List {
-                if (serverManager.placeLoc.coordinate == CLLocation().coordinate) {
+                if (targetLoc.coordinate == CLLocation().coordinate) {
                     Text("Move to a building to view posts.")
-                } else if (serverManager.locPosts[serverManager.placeLoc] == nil) {
+                } else if (serverManager.locPosts[targetLoc] == nil) {
                     Text("Loading...")
-                } else if (serverManager.locPosts[serverManager.placeLoc]!.isEmpty) {
+                } else if (serverManager.locPosts[targetLoc]!.isEmpty) {
                     Text("No posts here just yet.")
                 } else {
-                    ForEach(serverManager.locPosts[serverManager.placeLoc]!, id: \.id) { post in
-                        PostView(post:post, serverManager: serverManager)
+                    ForEach(serverManager.locPosts[targetLoc]!, id: \.id) { post in
+                        PostView(post:post, targetLoc:targetLoc, serverManager: serverManager)
                     }
-            }
+                }
             }
             .refreshable {
-                if (!(serverManager.placeLoc.coordinate == CLLocation().coordinate)) {
-                    await serverManager.updatePosts(location: serverManager.placeLoc)
-            }
+                if (!(targetLoc.coordinate == CLLocation().coordinate)) {
+                    await serverManager.updatePosts(location: targetLoc)
+                }
             }
             .scrollContentBackground(.hidden)
         }
@@ -29,10 +30,12 @@ struct PostsViewSheet: View {
 }
 struct PostView: View {
     @ObservedObject var post:PostMutable
-    var serverManager:ServerManager
+    let targetLoc:CLLocation
+    @ObservedObject var serverManager:ServerManager
     let formatter = RelativeDateTimeFormatter()
-    init(post: PostMutable, serverManager: ServerManager) {
+    init(post: PostMutable, targetLoc:CLLocation, serverManager: ServerManager) {
         self.post = post
+        self.targetLoc = targetLoc
         self.serverManager = serverManager
     }
     var body: some View {
@@ -42,7 +45,7 @@ struct PostView: View {
                     .lineLimit(nil)
                     .minimumScaleFactor(0.5)
                 Spacer()
-                Text(formatter.localizedString(for: Date.init(timeIntervalSince1970: TimeInterval(post.date / 1000)), relativeTo: (serverManager.locPostsUpdated[serverManager.placeLoc] ?? Date.now)))
+                Text(formatter.localizedString(for: Date.init(timeIntervalSince1970: TimeInterval(post.date / 1000)), relativeTo: (serverManager.locPostsUpdated[targetLoc] ?? Date.now)))
                     .font(.system(size: 12))
             }
             Spacer()

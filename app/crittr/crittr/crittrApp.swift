@@ -11,12 +11,11 @@ struct crittrApp: App {
         }
     }
 }
-// This should really be called something besides servermanager because it does location too but we ball i guess.
 class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
     @Published var locPosts: [CLLocation: [PostMutable]] = [:]
     var locPostsUpdated: [CLLocation: Date] = [:]
     @Published var locName:String = ""
-    private var geocoder = CLGeocoder()
+    var geocoder = CLGeocoder()
     // curCoords is the current location of the user
     var curLoc:CLLocation = CLLocation()
     // locCoords is the coordinates of the nearest location
@@ -67,7 +66,7 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
         }
     }
     func gcHandler(placemarks: [CLPlacemark]?, _: Error?) {
-        if (placemarks == nil || placemarks!.isEmpty || (placemarks!.first!.location == nil) || (placemarks!.first!.subThoroughfare == nil) || (placemarks!.first!.thoroughfare == nil)) {
+        if (placemarks == nil || placemarks!.isEmpty  || (placemarks!.first!.subThoroughfare == nil) || (placemarks!.first!.thoroughfare == nil)) {
             placeLoc = CLLocation()
             locName = ""
             return
@@ -77,12 +76,9 @@ class ServerManager: NSObject, CLLocationManagerDelegate, ObservableObject {
         // Use location's region coords because using the location's location coords varies
         if (placemarks!.first!.region! is CLCircularRegion) {
             let circRegion:CLCircularRegion = placemarks!.first!.region! as! CLCircularRegion
-            let newPlaceLoc = CLLocation(latitude:circRegion.center.latitude,longitude:circRegion.center.longitude)
+            let newPlaceLoc = CLLocation(latitude:circRegion.center.latitude, longitude:circRegion.center.longitude)
             doUpdate = (newPlaceLoc != placeLoc)
             placeLoc = newPlaceLoc
-        } else {
-            placeLoc = placemarks!.first!.location!
-            doUpdate = true
         }
         if (doUpdate) {
             Task {
